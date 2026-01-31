@@ -21,8 +21,8 @@ Dashboard pour visualiser et gérer les événements 42 Builders avec intégrati
 
 1. Cloner le repository :
 ```bash
-git clone <votre-repo-url>
-cd 42-api-integration
+git clone git@github.com:Marchy2020/42Builders.git
+cd 42Builders
 ```
 
 2. Installer les dépendances :
