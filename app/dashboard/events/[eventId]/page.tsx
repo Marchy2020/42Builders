@@ -9,18 +9,18 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { 
-  ArrowLeft, 
-  Calendar, 
-  Clock, 
-  MapPin, 
-  Users, 
+import {
+  ArrowLeft,
+  Calendar,
+  Clock,
+  MapPin,
+  Users,
   Search,
   RefreshCw,
   Download,
   ExternalLink
 } from "lucide-react";
-import type { Event42, EventUser } from "@/lib/42api";
+import type { Event42, EventUser, User42 } from "@/lib/42api";
 import { format, parseISO, isPast, isFuture } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -50,7 +50,42 @@ export default function EventDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
+  const [currentUser, setCurrentUser] = useState<User42 | null>(null);
+  const [isCheckingAdmin, setIsCheckingAdmin] = useState(true);
   const lastRequestTimeRef = useRef<number>(0);
+
+  const checkAdminAccess = useCallback(async () => {
+    setIsCheckingAdmin(true);
+    try {
+      const res = await fetch("/api/auth/me");
+      if (res.ok) {
+        const user: User42 = await res.json();
+        setCurrentUser(user);
+
+        // Vérifier si l'utilisateur est admin
+        if (user.login !== "mcherkao") {
+          setError("Accès refusé. Seuls les administrateurs peuvent voir la liste des participants.");
+          setIsLoadingEvent(false);
+          setIsLoadingUsers(false);
+          return false;
+        }
+        return true;
+      } else {
+        setError("Erreur lors de la vérification des permissions.");
+        setIsLoadingEvent(false);
+        setIsLoadingUsers(false);
+        return false;
+      }
+    } catch (err) {
+      console.error("Error checking admin access:", err);
+      setError("Erreur lors de la vérification des permissions.");
+      setIsLoadingEvent(false);
+      setIsLoadingUsers(false);
+      return false;
+    } finally {
+      setIsCheckingAdmin(false);
+    }
+  }, []);
 
   const fetchEvent = useCallback(async () => {
     // Éviter les requêtes trop rapides (minimum 1 seconde entre les requêtes)
@@ -60,17 +95,17 @@ export default function EventDetailPage() {
       const waitTime = 1000 - timeSinceLastRequest;
       await new Promise(resolve => setTimeout(resolve, waitTime));
     }
-    
+
     setIsLoadingEvent(true);
     setError(null);
     lastRequestTimeRef.current = Date.now();
-    
+
     try {
       const res = await fetch(`/api/events/${eventId}`);
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         const errorMessage = errorData.error || "Failed to fetch event";
-        
+
         // Gestion spéciale pour le rate limit
         if (res.status === 429 || errorMessage.includes("429") || errorMessage.includes("Rate Limit")) {
           setError("Trop de requêtes. Veuillez patienter quelques instants avant de réessayer.");
@@ -97,7 +132,7 @@ export default function EventDetailPage() {
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         const errorMessage = errorData.error || "Failed to fetch event users";
-        
+
         // Gestion spéciale pour le rate limit
         if (res.status === 429 || errorMessage.includes("429") || errorMessage.includes("Rate Limit")) {
           console.warn("Rate limit reached while fetching event users");
@@ -108,7 +143,7 @@ export default function EventDetailPage() {
         return;
       }
       const data = await res.json();
-      
+
       // Vérifier que c'est un tableau
       if (Array.isArray(data)) {
         setEventUsers((prev) => (page === 1 ? data : [...prev, ...data]));
@@ -121,12 +156,20 @@ export default function EventDetailPage() {
   }, [eventId, page]);
 
   useEffect(() => {
-    fetchEvent();
-  }, [fetchEvent]);
+    async function init() {
+      const isAdmin = await checkAdminAccess();
+      if (isAdmin) {
+        fetchEvent();
+      }
+    }
+    init();
+  }, [checkAdminAccess, fetchEvent]);
 
   useEffect(() => {
-    fetchEventUsers();
-  }, [fetchEventUsers]);
+    if (currentUser && currentUser.login === "mcherkao") {
+      fetchEventUsers();
+    }
+  }, [fetchEventUsers, currentUser]);
 
   useEffect(() => {
     if (searchQuery.trim() === "") {
@@ -153,7 +196,7 @@ export default function EventDetailPage() {
       eu.user.first_name,
       eu.user.email,
     ]);
-    
+
     const csvContent = [
       headers.join(","),
       ...rows.map((row) => row.map((cell) => `"${cell || ""}"`).join(",")),
@@ -168,9 +211,21 @@ export default function EventDetailPage() {
     URL.revokeObjectURL(url);
   };
 
+  if (isCheckingAdmin) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+          <p className="text-muted-foreground">Vérification des permissions...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (error) {
     const isRateLimit = error.includes("429") || error.includes("Rate Limit") || error.includes("Trop de requêtes");
-    
+    const isAccessDenied = error.includes("Accès refusé");
+
     return (
       <div className="space-y-6">
         <Link href="/dashboard">
@@ -182,7 +237,7 @@ export default function EventDetailPage() {
         <Card className="border-destructive/50 bg-destructive/5">
           <CardHeader>
             <CardTitle className="text-destructive flex items-center gap-2">
-              {isRateLimit ? "Limite de requêtes atteinte" : "Erreur"}
+              {isAccessDenied ? "Accès refusé" : isRateLimit ? "Limite de requêtes atteinte" : "Erreur"}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -193,19 +248,27 @@ export default function EventDetailPage() {
                 <p>Veuillez attendre 1-2 minutes avant de réessayer.</p>
               </div>
             )}
-            <div className="flex gap-2">
-              <Button 
-                onClick={() => {
-                  setError(null);
-                  fetchEvent();
-                }} 
-                disabled={isLoadingEvent}
-                variant="outline"
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingEvent ? "animate-spin" : ""}`} />
-                Réessayer
-              </Button>
-            </div>
+            {isAccessDenied && (
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>Cette page est réservée aux administrateurs.</p>
+                <p>Seul l'administrateur peut voir la liste des participants.</p>
+              </div>
+            )}
+            {!isAccessDenied && (
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => {
+                    setError(null);
+                    fetchEvent();
+                  }}
+                  disabled={isLoadingEvent}
+                  variant="outline"
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingEvent ? "animate-spin" : ""}`} />
+                  Réessayer
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -238,7 +301,7 @@ export default function EventDetailPage() {
                   {event.name}
                 </CardTitle>
                 {event.description && (
-                  <CardDescription 
+                  <CardDescription
                     className="max-w-3xl"
                     dangerouslySetInnerHTML={{ __html: event.description }}
                   />
@@ -283,18 +346,18 @@ export default function EventDetailPage() {
             Participants ({eventUsers.length})
           </h2>
           <div className="flex items-center gap-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               onClick={exportCSV}
               disabled={eventUsers.length === 0}
             >
               <Download className="h-4 w-4 mr-2" />
               Exporter CSV
             </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => {
                 setPage(1);
                 fetchEventUsers();
@@ -339,8 +402,8 @@ export default function EventDetailPage() {
                   <CardContent className="p-4">
                     <div className="flex items-center gap-3">
                       <Avatar className="h-12 w-12">
-                        <AvatarImage 
-                          src={eu.user.image?.versions?.small || eu.user.image?.link || undefined} 
+                        <AvatarImage
+                          src={eu.user.image?.versions?.small || eu.user.image?.link || undefined}
                           alt={eu.user.displayname}
                         />
                         <AvatarFallback className="bg-primary text-primary-foreground">

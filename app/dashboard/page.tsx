@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronLeft, ChevronRight, Search, RefreshCw, Calendar } from "lucide-react";
-import type { Event42 } from "@/lib/42api";
+import type { Event42, User42 } from "@/lib/42api";
 
 export default function DashboardPage() {
   const [allEvents, setAllEvents] = useState<Event42[]>([]); // Tous les événements du campus
@@ -16,6 +16,7 @@ export default function DashboardPage() {
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [totalPages, setTotalPages] = useState(1);
+  const [currentUser, setCurrentUser] = useState<User42 | null>(null);
   const perPage = 30;
 
   // Récupérer les événements à venir du campus
@@ -29,7 +30,7 @@ export default function DashboardPage() {
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         const errorMessage = errorData.error || "Failed to fetch events";
-        
+
         // Gestion spéciale pour le rate limit
         if (errorMessage.includes("429") || errorMessage.includes("Rate Limit")) {
           setError("Trop de requêtes. Veuillez patienter quelques instants avant de réessayer.");
@@ -41,7 +42,7 @@ export default function DashboardPage() {
         return;
       }
       const data = await res.json();
-      
+
       // Vérifier si la réponse est un tableau
       if (!Array.isArray(data)) {
         console.error("API response is not an array:", data);
@@ -50,11 +51,11 @@ export default function DashboardPage() {
         setFilteredEvents([]);
         return;
       }
-      
+
       setAllEvents(data);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Erreur lors du chargement des events";
-      
+
       // Gestion spéciale pour le rate limit
       if (errorMessage.includes("429") || errorMessage.includes("Rate Limit")) {
         setError("Trop de requêtes. Veuillez patienter quelques instants avant de réessayer.");
@@ -71,6 +72,20 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchAllEvents();
+
+    // Récupérer l'utilisateur actuel pour vérifier les permissions
+    async function fetchCurrentUser() {
+      try {
+        const res = await fetch("/api/auth/me");
+        if (res.ok) {
+          const user: User42 = await res.json();
+          setCurrentUser(user);
+        }
+      } catch (err) {
+        console.error("Error fetching current user:", err);
+      }
+    }
+    fetchCurrentUser();
   }, [fetchAllEvents]);
 
   // Pagination et recherche
@@ -165,7 +180,11 @@ export default function DashboardPage() {
         <>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filteredEvents.map((event) => (
-              <EventCard key={event.id} event={event} />
+              <EventCard
+                key={event.id}
+                event={event}
+                isAdmin={currentUser?.login === "mcherkao"}
+              />
             ))}
           </div>
 

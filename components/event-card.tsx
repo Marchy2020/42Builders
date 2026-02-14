@@ -11,6 +11,7 @@ import Link from "next/link";
 
 interface EventCardProps {
   event: Event42;
+  isAdmin?: boolean;
 }
 
 function getEventStatus(beginAt: string, endAt: string) {
@@ -41,7 +42,7 @@ function getKindLabel(kind: string) {
   return kinds[kind] || kind;
 }
 
-export function EventCard({ event }: EventCardProps) {
+export function EventCard({ event, isAdmin = false }: EventCardProps) {
   const status = getEventStatus(event.begin_at, event.end_at);
   const beginDate = parseISO(event.begin_at);
   const endDate = parseISO(event.end_at);
@@ -97,12 +98,14 @@ export function EventCard({ event }: EventCardProps) {
           </div>
         </div>
 
-        <Link href={`/dashboard/events/${event.id}`}>
-          <Button variant="secondary" className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-            Voir les participants
-            <ChevronRight className="h-4 w-4 ml-2" />
-          </Button>
-        </Link>
+        {isAdmin && (
+          <Link href={`/dashboard/events/${event.id}`}>
+            <Button variant="secondary" className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+              Voir les participants
+              <ChevronRight className="h-4 w-4 ml-2" />
+            </Button>
+          </Link>
+        )}
       </CardContent>
     </Card>
   );

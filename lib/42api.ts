@@ -71,7 +71,7 @@ export interface EventUser {
 export function getAuthorizationUrl(): string {
   const clientId = process.env.FORTYTWO_CLIENT_ID;
   const redirectUri = process.env.FORTYTWO_REDIRECT_URI || "http://localhost:3000/api/auth/callback";
-  
+
   const params = new URLSearchParams({
     client_id: clientId || "",
     redirect_uri: redirectUri,
@@ -173,7 +173,7 @@ export async function fetchCampusEvents(
   }
 
   const data = await response.json();
-  
+
   // S'assurer que la réponse est un tableau
   if (!Array.isArray(data)) {
     console.error("42 API returned non-array response:", data);
@@ -181,7 +181,7 @@ export async function fetchCampusEvents(
   }
 
   // Filtrer par campus_id (car campus_ids est un tableau dans Event42)
-  const filteredEvents = data.filter((event: Event42) => 
+  const filteredEvents = data.filter((event: Event42) =>
     event.campus_ids && event.campus_ids.includes(campusId)
   );
 
@@ -222,7 +222,7 @@ export async function fetchAllCampusEvents(
         console.warn("Rate limit reached, stopping pagination");
         break;
       }
-      
+
       const errorText = await response.text();
       let errorMessage = `Failed to fetch campus events: ${response.status} ${response.statusText}`;
       try {
@@ -235,7 +235,7 @@ export async function fetchAllCampusEvents(
     }
 
     const data = await response.json();
-    
+
     // S'assurer que la réponse est un tableau
     if (!Array.isArray(data)) {
       console.error("42 API returned non-array response:", data);
@@ -249,10 +249,10 @@ export async function fetchAllCampusEvents(
     }
 
     // Filtrer par campus_id et ajouter aux résultats
-    const filteredEvents = data.filter((event: Event42) => 
+    const filteredEvents = data.filter((event: Event42) =>
       event.campus_ids && event.campus_ids.includes(campusId)
     );
-    
+
     allCampusEvents.push(...filteredEvents);
 
     // Si on a récupéré moins que pageSize, c'est la dernière page
@@ -270,6 +270,35 @@ export async function fetchAllCampusEvents(
   return allCampusEvents;
 }
 
+export async function fetchCurrentUser(accessToken: string): Promise<User42> {
+  const response = await fetch(`${API_BASE}/v2/me`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errorMessage = `Failed to fetch current user: ${response.status} ${response.statusText}`;
+
+    // Gestion spéciale pour le rate limit
+    if (response.status === 429) {
+      errorMessage = "429 Too Many Requests (Spam Rate Limit Exceeded)";
+    } else {
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorMessage = errorJson.message || errorJson.error || errorMessage;
+      } catch {
+        errorMessage = errorText || errorMessage;
+      }
+    }
+
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
 export async function fetchEvent(
   accessToken: string,
   eventId: number
@@ -283,7 +312,7 @@ export async function fetchEvent(
   if (!response.ok) {
     const errorText = await response.text();
     let errorMessage = `Failed to fetch event: ${response.status} ${response.statusText}`;
-    
+
     // Gestion spéciale pour le rate limit
     if (response.status === 429) {
       errorMessage = "429 Too Many Requests (Spam Rate Limit Exceeded)";
@@ -295,7 +324,7 @@ export async function fetchEvent(
         errorMessage = errorText || errorMessage;
       }
     }
-    
+
     throw new Error(errorMessage);
   }
 
@@ -325,7 +354,7 @@ export async function fetchEventUsers(
   if (!response.ok) {
     const errorText = await response.text();
     let errorMessage = `Failed to fetch event users: ${response.status} ${response.statusText}`;
-    
+
     // Gestion spéciale pour le rate limit
     if (response.status === 429) {
       errorMessage = "429 Too Many Requests (Spam Rate Limit Exceeded)";
@@ -337,12 +366,12 @@ export async function fetchEventUsers(
         errorMessage = errorText || errorMessage;
       }
     }
-    
+
     throw new Error(errorMessage);
   }
 
   const data = await response.json();
-  
+
   // S'assurer que la réponse est un tableau
   if (!Array.isArray(data)) {
     console.error("42 API returned non-array response for event users:", data);

@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, Users, LogIn, AlertCircle, Loader2 } from "lucide-react";
+import { LogIn, AlertCircle, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function HomePage() {
@@ -29,7 +30,7 @@ export default function HomePage() {
               },
               body: JSON.stringify({ code }),
             });
-            
+
             if (res.ok) {
               // Nettoyer l'URL et rediriger vers le dashboard
               router.replace("/dashboard");
@@ -69,12 +70,22 @@ export default function HomePage() {
   return (
     <main className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
       <div className="max-w-md w-full space-y-8">
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-4">
+          <div className="flex justify-center mb-4">
+            <Image
+              src="/placeholder-logo.png"
+              alt="42Builders Logo"
+              width={128}
+              height={128}
+              className="object-contain"
+              priority
+            />
+          </div>
           <h1 className="text-4xl font-bold text-foreground tracking-tight">
-            42 Events
+            42Builders
           </h1>
           <p className="text-muted-foreground">
-            Dashboard pour les events 42 Builders
+            To build beyond localhost
           </p>
         </div>
 
@@ -96,24 +107,7 @@ export default function HomePage() {
               Connectez-vous avec votre compte 42 pour acceder aux events
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary">
-                <Calendar className="h-5 w-5 text-primary" />
-                <div>
-                  <p className="text-sm font-medium text-secondary-foreground">Events</p>
-                  <p className="text-xs text-muted-foreground">Campus Paris</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary">
-                <Users className="h-5 w-5 text-primary" />
-                <div>
-                  <p className="text-sm font-medium text-secondary-foreground">Participants</p>
-                  <p className="text-xs text-muted-foreground">Liste complete</p>
-                </div>
-              </div>
-            </div>
-
+          <CardContent>
             <Button asChild className="w-full" size="lg">
               <a href="/api/auth/login">
                 <LogIn className="mr-2 h-5 w-5" />

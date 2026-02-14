@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { fetchEventUsers, getClientCredentialsToken } from "@/lib/42api";
+import { fetchEventUsers, getClientCredentialsToken, fetchCurrentUser } from "@/lib/42api";
 
 export async function GET(
   request: NextRequest,
@@ -16,8 +16,27 @@ export async function GET(
     let accessToken = cookieStore.get("42_access_token")?.value;
 
     if (!accessToken) {
-      const tokenResponse = await getClientCredentialsToken();
-      accessToken = tokenResponse.access_token;
+      return NextResponse.json(
+        { error: "Not authenticated" },
+        { status: 401 }
+      );
+    }
+
+    // Vérifier que l'utilisateur est admin
+    try {
+      const currentUser = await fetchCurrentUser(accessToken);
+      if (currentUser.login !== "mcherkao") {
+        return NextResponse.json(
+          { error: "Access denied. Only administrators can view participants list." },
+          { status: 403 }
+        );
+      }
+    } catch (err) {
+      console.error("Error checking admin access:", err);
+      return NextResponse.json(
+        { error: "Failed to verify permissions" },
+        { status: 500 }
+      );
     }
 
     const eventUsers = await fetchEventUsers(
@@ -31,13 +50,13 @@ export async function GET(
   } catch (error) {
     console.error("Error fetching event users:", error);
     const errorMessage = error instanceof Error ? error.message : "Failed to fetch event users";
-    
+
     // Gestion spéciale pour le rate limit
     let status = 500;
     if (errorMessage.includes("429") || errorMessage.includes("Rate Limit")) {
       status = 429;
     }
-    
+
     return NextResponse.json(
       { error: errorMessage },
       { status }
