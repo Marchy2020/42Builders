@@ -135,7 +135,7 @@ export default function DashboardPage() {
             Events Campus Paris
           </h1>
           <p className="text-muted-foreground mt-1">
-            Liste des events 42 Builders à venir
+            Liste de tous les events 42 à venir
           </p>
         </div>
         <Button variant="outline" onClick={fetchAllEvents} disabled={isLoading}>
