@@ -19,8 +19,63 @@ export default function DashboardPage() {
   const [currentUser, setCurrentUser] = useState<User42 | null>(null);
   const perPage = 30;
 
+  // Clés pour le cache localStorage
+  const CACHE_KEY = "42builders_events_cache";
+  const CACHE_EXPIRY_KEY = "42builders_events_cache_expiry";
+  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+  // Fonction pour vérifier et récupérer le cache
+  const getCachedEvents = (): Event42[] | null => {
+    if (typeof window === "undefined") return null;
+
+    try {
+      const cachedData = localStorage.getItem(CACHE_KEY);
+      const expiryTime = localStorage.getItem(CACHE_EXPIRY_KEY);
+
+      if (!cachedData || !expiryTime) return null;
+
+      const now = Date.now();
+      const expiry = parseInt(expiryTime, 10);
+
+      if (now > expiry) {
+        // Cache expiré, le supprimer
+        localStorage.removeItem(CACHE_KEY);
+        localStorage.removeItem(CACHE_EXPIRY_KEY);
+        return null;
+      }
+
+      return JSON.parse(cachedData);
+    } catch (err) {
+      console.error("Error reading cache:", err);
+      return null;
+    }
+  };
+
+  // Fonction pour sauvegarder dans le cache
+  const setCachedEvents = (events: Event42[]) => {
+    if (typeof window === "undefined") return;
+
+    try {
+      const expiry = Date.now() + CACHE_DURATION;
+      localStorage.setItem(CACHE_KEY, JSON.stringify(events));
+      localStorage.setItem(CACHE_EXPIRY_KEY, expiry.toString());
+    } catch (err) {
+      console.error("Error saving cache:", err);
+    }
+  };
+
   // Récupérer les événements à venir du campus
-  const fetchAllEvents = useCallback(async () => {
+  const fetchAllEvents = useCallback(async (forceRefresh = false) => {
+    // Vérifier le cache si ce n'est pas un rafraîchissement forcé
+    if (!forceRefresh) {
+      const cachedEvents = getCachedEvents();
+      if (cachedEvents && cachedEvents.length > 0) {
+        setAllEvents(cachedEvents);
+        setIsLoading(false);
+        return;
+      }
+    }
+
     setIsLoading(true);
     setError(null);
     try {
@@ -53,6 +108,7 @@ export default function DashboardPage() {
       }
 
       setAllEvents(data);
+      setCachedEvents(data); // Sauvegarder dans le cache
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Erreur lors du chargement des events";
 
@@ -73,13 +129,31 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchAllEvents();
 
-    // Récupérer l'utilisateur actuel pour vérifier les permissions
+    // Récupérer l'utilisateur actuel pour vérifier les permissions (avec cache)
     async function fetchCurrentUser() {
+      // Vérifier le cache pour l'utilisateur
+      if (typeof window !== "undefined") {
+        try {
+          const cachedUser = localStorage.getItem("42builders_current_user");
+          if (cachedUser) {
+            const user: User42 = JSON.parse(cachedUser);
+            setCurrentUser(user);
+            return;
+          }
+        } catch (err) {
+          console.error("Error reading user cache:", err);
+        }
+      }
+
       try {
         const res = await fetch("/api/auth/me");
         if (res.ok) {
           const user: User42 = await res.json();
           setCurrentUser(user);
+          // Sauvegarder dans le cache
+          if (typeof window !== "undefined") {
+            localStorage.setItem("42builders_current_user", JSON.stringify(user));
+          }
         }
       } catch (err) {
         console.error("Error fetching current user:", err);
@@ -138,7 +212,7 @@ export default function DashboardPage() {
             Liste de tous les events 42 à venir
           </p>
         </div>
-        <Button variant="outline" onClick={fetchAllEvents} disabled={isLoading}>
+        <Button variant="outline" onClick={() => fetchAllEvents(true)} disabled={isLoading}>
           <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
           Actualiser
         </Button>

@@ -57,11 +57,22 @@ export function DashboardNav() {
         </nav>
 
         <div className="ml-auto">
-          <Button variant="ghost" size="sm" asChild>
-            <a href="/api/auth/logout" className="gap-2">
-              <LogOut className="h-4 w-4" />
-              <span className="hidden sm:inline-block">Deconnexion</span>
-            </a>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => {
+              // Nettoyer le cache avant la déconnexion
+              if (typeof window !== "undefined") {
+                localStorage.removeItem("42builders_events_cache");
+                localStorage.removeItem("42builders_events_cache_expiry");
+                localStorage.removeItem("42builders_current_user");
+              }
+              window.location.href = "/api/auth/logout";
+            }}
+            className="gap-2"
+          >
+            <LogOut className="h-4 w-4" />
+            <span className="hidden sm:inline-block">Deconnexion</span>
           </Button>
         </div>
       </div>

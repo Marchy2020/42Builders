@@ -18,7 +18,8 @@ import {
   Search,
   RefreshCw,
   Download,
-  ExternalLink
+  ExternalLink,
+  Loader2
 } from "lucide-react";
 import type { Event42, EventUser, User42 } from "@/lib/42api";
 import { format, parseISO, isPast, isFuture } from "date-fns";
